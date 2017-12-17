@@ -8,10 +8,6 @@ scalaVersion := "2.12.3"
 
 sbtPlugin := true
 
-publishTo := Some("Artifactory Realm" at "https://iadvize.jfrog.io/iadvize/iadvize-sbt")
-
-credentials += Credentials("Artifactory Realm", "iadvize.jfrog.io", sys.env.getOrElse("ARTIFACTORY_USERNAME", sys.props.getOrElse("ARTIFACTORY_USERNAME", "")), sys.env.getOrElse("ARTIFACTORY_PASS", sys.props.getOrElse("ARTIFACTORY_PASS", "")))
-
 resolvers += "confluent" at "http://packages.confluent.io/maven"
 
 libraryDependencies ++= Seq(
@@ -20,6 +16,11 @@ libraryDependencies ++= Seq(
 )
 
 crossScalaVersions := Seq(scalaVersion.value, "2.11.11", "2.10.6")
+
+publishMavenStyle := false
+bintrayRepository := "sbt-plugins"
+bintrayPackageLabels := Seq("sbt","plugin")
+licenses += ("MIT", url("http://opensource.org/licenses/MIT"))
 
 scriptedBufferLog := false
 scriptedLaunchOpts ++= Seq(
