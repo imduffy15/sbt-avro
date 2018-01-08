@@ -187,7 +187,7 @@ object AvroPlugin extends AutoPlugin {
       Files.newDirectoryStream(path, "*.avsc").iterator().asScala.flatMap { schemaPath =>
         Try(parser.parse(schemaPath.toFile)) match {
           case Success(schema) =>
-            Some(schema.getName -> (schemaPath.toFile, schema)))
+            Some(schema.getName -> (schemaPath.toFile, schema))
           case Failure(ex) =>
             logger.error(s"Can't parse schema $schemaPath, got error: ${ex.getMessage}")
             None
