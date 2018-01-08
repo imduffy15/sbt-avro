@@ -1,10 +1,19 @@
+import sbtrelease.ReleaseStateTransformations._
+
 sbtPlugin := true
 
 name := "sbt-avro"
 
 organization := "com.iadvize"
 
-scalaVersion := "2.12.3"
+scalaVersion := "2.12.4"
+
+sbtVersion in Global := "1.0.4"
+
+scalaCompilerBridgeSource := {
+  val sv = appConfiguration.value.provider.id.version
+  ("org.scala-sbt" % "compiler-interface" % sv % "component").sources
+}
 
 sbtPlugin := true
 
@@ -15,14 +24,32 @@ libraryDependencies ++= Seq(
   "io.confluent"    % "kafka-schema-registry-client" % "3.3.0"
 )
 
-crossScalaVersions := Seq(scalaVersion.value, "2.11.11", "2.10.6")
+crossSbtVersions := Vector("0.13.16", "1.0.0")
+
+releaseCrossBuild := true
 
 publishMavenStyle := false
+bintrayOrganization := Some("iduffy")
 bintrayRepository := "sbt-plugins"
-bintrayPackageLabels := Seq("sbt","plugin")
-licenses += ("MIT", url("http://opensource.org/licenses/MIT"))
+
+ScriptedPlugin.scriptedSettings
+
+scriptedSettings
 
 scriptedBufferLog := false
-scriptedLaunchOpts ++= Seq(
-  "-Xmx1024M",
-  s"-Dplugin.version=${version.value}")
+
+scriptedLaunchOpts ++= Seq("-Xmx1G", "-Dplugin.version=" + version.value)
+
+releaseProcess := Seq[ReleaseStep](
+  checkSnapshotDependencies,
+  inquireVersions,
+  runClean,
+  releaseStepCommandAndRemaining("^ test"),
+  setReleaseVersion,
+  commitReleaseVersion,
+  tagRelease,
+  releaseStepCommandAndRemaining("^ publish"),
+  setNextVersion,
+  commitNextVersion,
+  pushChanges
+)

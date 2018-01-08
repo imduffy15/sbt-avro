@@ -12,7 +12,6 @@ import org.apache.avro.compiler.specific.SpecificCompiler
 import scala.collection.JavaConverters._
 import sbt._
 import sbt.Keys._
-import sbt.internal.util.ManagedLogger
 
 import scala.util.Try
 
@@ -182,7 +181,7 @@ object AvroPlugin extends AutoPlugin {
     }.toSeq
   }
 
-  private def parseSchemas(logger: ManagedLogger, path: Path) = {
+  private def parseSchemas(logger: Logger, path: Path) = {
     val parser = new Parser()
     if (path.toFile.exists())
       Files.newDirectoryStream(path, "*.avsc").iterator().asScala.flatMap { schemaPath =>
