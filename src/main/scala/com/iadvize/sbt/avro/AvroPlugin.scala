@@ -5,13 +5,17 @@ import java.io.File
 import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient
 import java.nio.file.{Files, Path, Paths}
 
+import avrohugger.Generator
+import avrohugger.format.Standard
 import org.apache.avro
 import org.apache.avro.Schema.Parser
-import org.apache.avro.compiler.specific.SpecificCompiler
+import org.json4s
 
 import scala.collection.JavaConverters._
 import sbt._
 import sbt.Keys._
+import org.json4s._
+import org.json4s.native.JsonMethods._
 
 import scala.util.{Failure, Success, Try}
 
@@ -25,58 +29,9 @@ object Version {
 
 case class Schema(subject: String, version: Version)
 
-class AvroCompiler(schema: avro.Schema) extends SpecificCompiler(schema) {
-
-  val queueField = {
-    val field = classOf[SpecificCompiler].getDeclaredField("queue")
-    field.setAccessible(true)
-    field
-  }
-
-  val compileMethod = {
-    val method = classOf[SpecificCompiler].getDeclaredMethod("compile", classOf[avro.Schema])
-    method.setAccessible(true)
-    method
-  }
-
-  val writeToDestinationMethod = {
-    val method = classOf[SpecificCompiler].getDeclaredClasses.find(_.getSimpleName == "OutputFile").get.getDeclaredMethod("writeToDestination", classOf[File], classOf[File])
-    method.setAccessible(true)
-    method
-  }
-
-  val NullSchema = avro.Schema.create(avro.Schema.Type.NULL)
-
-  override def javaUnbox(schema: avro.Schema) = {
-    schema.getType match {
-      case avro.Schema.Type.ARRAY => "Array[" + javaUnbox(schema.getElementType) + "]"
-      case avro.Schema.Type.BOOLEAN => "Boolean"
-      case avro.Schema.Type.BYTES => "Array[Byte]"
-      case avro.Schema.Type.DOUBLE => "Double"
-      case avro.Schema.Type.ENUM => SpecificCompiler.mangle(schema.getFullName) + ".Value"
-      case avro.Schema.Type.FIXED => SpecificCompiler.mangle(schema.getFullName)
-      case avro.Schema.Type.FLOAT => "Float"
-      case avro.Schema.Type.INT => "Int"
-      case avro.Schema.Type.LONG => "Long"
-      case avro.Schema.Type.MAP => "Map[String, " + javaUnbox(schema.getValueType) + "]"
-      case avro.Schema.Type.NULL => "java.lang.Void"
-      case avro.Schema.Type.RECORD => SpecificCompiler.mangle(schema.getFullName)
-      case avro.Schema.Type.STRING => "String"
-      case avro.Schema.Type.UNION =>
-        val types = schema.getTypes.asScala
-        if (types.size == 2 && types.contains(NullSchema))
-          "Option[" + javaUnbox(if (types(0) == NullSchema) types(1) else types(0)) + "]"
-        else
-          "Any"
-    }
-  }
-
-  def compileToDestinationWithResult(src: File, dst: File) =
-    queueField.get(this).asInstanceOf[java.util.Set[avro.Schema]].asScala.map(schema => writeToDestinationMethod.invoke(compileMethod.invoke(this, schema), src, dst).asInstanceOf[File])
-
-}
-
 object AvroPlugin extends AutoPlugin {
+
+  implicit val formats = DefaultFormats
 
   object autoImport {
 
@@ -168,32 +123,52 @@ object AvroPlugin extends AutoPlugin {
 
     val configuredSourceManaged = sourceManaged.value
 
-    val schemasToGenerate = parseSchemas(logger, resourceManaged.value.toPath) ++
+    val schemasToGenerate: Map[String, (File, avro.Schema)] = parseSchemas(logger, resourceManaged.value.toPath) ++
       parseSchemas(logger, resourceDirectory.value.toPath)
 
     Files.createDirectories(configuredSourceManaged.toPath)
 
-    schemasToGenerate.values.flatMap { case (schemaFile, schema) =>
-      val compiler = new AvroCompiler(schema)
-      compiler.setSuffix(".scala")
-      compiler.setTemplateDir(classPathTemplatesDirectory.value)
-      compiler.compileToDestinationWithResult(schemaFile, configuredSourceManaged).toSeq
-    }.toSeq
+    val scalaV = scalaVersion.value
+    val isNumberOfFieldsRestricted = scalaV == "2.10"
+    val gen = Generator(format = Standard,
+      restrictedFieldNumber = isNumberOfFieldsRestricted)
+
+    val parser = new avro.Schema.Parser()
+
+    schemasToGenerate.foreach {
+      case (_, (_, schema)) =>
+        parse(schema.toString()).extractOpt[List[JValue]] match {
+          case Some(list) =>
+            list.foreach {jvalue =>
+              gen.schemaToFile(parser.parse(compact(render(jvalue))), configuredSourceManaged.getPath)
+            }
+          case _ =>
+            gen.schemaToFile(schema, configuredSourceManaged.getPath)
+        }
+    }
+
+    (configuredSourceManaged ** ("*.java" | "*.scala")).get.distinct
   }
 
   private def parseSchemas(logger: Logger, path: Path) = {
     val parser = new Parser()
     if (path.toFile.exists())
-      Files.newDirectoryStream(path, "*.avsc").iterator().asScala.flatMap { schemaPath =>
+      Files.newDirectoryStream(path).iterator().asScala.flatMap { schemaPath =>
         Try(parser.parse(schemaPath.toFile)) match {
           case Success(schema) =>
-            Some(schema.getName -> (schemaPath.toFile, schema))
+            Some(getFilename(schemaPath) -> (schemaPath.toFile, schema))
           case Failure(ex) =>
             logger.error(s"Can't parse schema $schemaPath, got error: ${ex.getMessage}")
             None
         }
       }.toMap
     else Map.empty[String, (File, avro.Schema)]
+  }
+
+  private def getFilename(path: Path): String = {
+    val filename = path.getFileName.toString
+    if (filename.indexOf(".") > 0) filename.substring(0, filename.lastIndexOf("."))
+    else filename
   }
 
   override def requires = sbt.plugins.JvmPlugin
