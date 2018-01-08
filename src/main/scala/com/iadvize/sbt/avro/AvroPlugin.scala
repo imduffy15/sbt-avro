@@ -13,7 +13,7 @@ import scala.collection.JavaConverters._
 import sbt._
 import sbt.Keys._
 
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 case class Version(version: Int)
 
@@ -185,9 +185,13 @@ object AvroPlugin extends AutoPlugin {
     val parser = new Parser()
     if (path.toFile.exists())
       Files.newDirectoryStream(path, "*.avsc").iterator().asScala.flatMap { schemaPath =>
-        Try(parser.parse(schemaPath.toFile)).fold(throwable => {
-          logger.error(s"Can't parse schema $schemaPath, got error: ${throwable.getMessage}"); None
-        }, schema => Some(schema.getName -> (schemaPath.toFile, schema)))
+        Try(parser.parse(schemaPath.toFile)) match {
+          case Success(schema) =>
+            Some(schema.getName -> (schemaPath.toFile, schema)))
+          case Failure(ex) =>
+            logger.error(s"Can't parse schema $schemaPath, got error: ${ex.getMessage}")
+            None
+        }
       }.toMap
     else Map.empty[String, (File, avro.Schema)]
   }
