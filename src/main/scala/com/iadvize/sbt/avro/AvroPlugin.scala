@@ -16,6 +16,7 @@ import sbt._
 import sbt.Keys._
 import org.json4s._
 import org.json4s.native.JsonMethods._
+import org.json4s.prefs.EmptyValueStrategy
 
 import scala.util.{Failure, Success, Try}
 
@@ -31,7 +32,7 @@ case class Schema(subject: String, version: Version)
 
 object AvroPlugin extends AutoPlugin {
 
-  implicit val formats = DefaultFormats
+  implicit val formats = DefaultFormats.withEmptyValueStrategy(EmptyValueStrategy.preserve)
 
   object autoImport {
 
