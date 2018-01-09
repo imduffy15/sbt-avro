@@ -20,7 +20,8 @@ sbtPlugin := true
 resolvers += "confluent" at "http://packages.confluent.io/maven"
 
 libraryDependencies ++= Seq(
-  "org.apache.avro" % "avro-compiler"                % "1.8.2",
+  "com.julianpeeters" %% "avrohugger-core" % "1.0.0-RC1",
+  "com.julianpeeters" %% "avrohugger-filesorter" % "1.0.0-RC1",
   "io.confluent"    % "kafka-schema-registry-client" % "3.3.0"
 )
 

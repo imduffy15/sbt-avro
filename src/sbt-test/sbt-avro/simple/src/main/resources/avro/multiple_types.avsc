@@ -1,0 +1,28 @@
+[
+  {
+    "type": "record",
+    "name": "Address",
+    "namespace": "simple",
+    "fields": [
+      {
+        "name": "street",
+        "type": "string"
+      },
+      {
+        "name": "postcode",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "type": "record",
+    "name": "User",
+    "namespace": "simple",
+    "fields": [
+      {
+        "name": "address",
+        "type": "simple.Address"
+      }
+    ]
+  }
+]
