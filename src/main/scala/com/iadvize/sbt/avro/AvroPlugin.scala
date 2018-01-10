@@ -6,7 +6,7 @@ import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient
 import java.nio.file.{Files, Path, Paths}
 
 import avrohugger.Generator
-import avrohugger.format.Standard
+import avrohugger.format.{SpecificRecord, Standard}
 import org.apache.avro
 import org.apache.avro.Schema.Parser
 
@@ -15,6 +15,7 @@ import sbt._
 import sbt.Keys._
 import spray.json._
 import DefaultJsonProtocol._
+import avrohugger.format.abstractions.SourceFormat
 
 import scala.util.{Failure, Success, Try}
 
@@ -42,7 +43,7 @@ object AvroPlugin extends AutoPlugin {
     val schemas = settingKey[Seq[Schema]]("List of schemas to download, an empty list will download latest version of all schemas, defaults to an empty list.")
     val directoryName = settingKey[String]("Name of the directories which will contain Avro files, defaults to avro.")
     val classPathTemplatesDirectory = settingKey[String]("Name of the directory containing the templates used to generate the Scala files, defaults to /template/avro/.")
-
+    val classFormat = settingKey[SourceFormat]("The format to be used for the scala case classes, defaults to specific record")
   }
 
   import autoImport._
@@ -52,6 +53,7 @@ object AvroPlugin extends AutoPlugin {
     classPathTemplatesDirectory := "/template/avro/",
     schemaRegistryEndpoint := "http://localhost:8081",
     schemas := Seq.empty[Schema],
+    classFormat := SpecificRecord,
     resourceManaged := (resourceManaged in Compile).value / directoryName.value,
     resourceDirectory := (resourceDirectory in Compile).value / directoryName.value,
     sourceManaged := (sourceManaged in Compile).value / directoryName.value,
@@ -127,7 +129,7 @@ object AvroPlugin extends AutoPlugin {
 
     val scalaV = scalaVersion.value
     val isNumberOfFieldsRestricted = scalaV == "2.10"
-    val gen = Generator(format = Standard,
+    val gen = Generator(format = classFormat.value,
       restrictedFieldNumber = isNumberOfFieldsRestricted)
 
     val parser = new avro.Schema.Parser()
