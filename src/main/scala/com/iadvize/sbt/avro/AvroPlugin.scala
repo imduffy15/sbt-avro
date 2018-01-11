@@ -59,7 +59,7 @@ object AvroPlugin extends AutoPlugin {
     sourceManaged := (sourceManaged in Compile).value / directoryName.value,
     download := downloadTask.value,
     upload := uploadTask.value,
-    generate := generateTask.value,
+    generate := generateTask.dependsOn(download).value,
 
     resourceGenerators in Compile += download.taskValue,
     managedResourceDirectories in Compile += (resourceManaged in Avro).value,
